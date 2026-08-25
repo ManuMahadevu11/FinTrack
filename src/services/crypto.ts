@@ -5,6 +5,11 @@ const PBKDF2_ITERATIONS = 100000;
 const KEY_LENGTH = 256;
 const VERIFICATION_PHRASE = "FINTRACK_ZERO_KNOWLEDGE_AUTH_OK";
 
+// Check if Web Crypto API is available (requires HTTPS or localhost on mobile browsers)
+export function isSecureCryptoSupported(): boolean {
+  return typeof window !== 'undefined' && !!window.crypto && !!window.crypto.subtle;
+}
+
 // ArrayBuffer <-> Base64 helpers
 export function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -26,16 +31,26 @@ export function base64ToBuffer(base64: string): ArrayBuffer {
 
 // Generate random cryptographic salt (16 bytes)
 export function generateSalt(): Uint8Array {
+  if (!isSecureCryptoSupported()) {
+    throw new Error('Web Crypto API requires an HTTPS secure connection on mobile browsers.');
+  }
   return window.crypto.getRandomValues(new Uint8Array(16));
 }
 
 // Generate random IV (12 bytes for AES-GCM)
 export function generateIV(): Uint8Array {
+  if (!isSecureCryptoSupported()) {
+    throw new Error('Web Crypto API requires an HTTPS secure connection on mobile browsers.');
+  }
   return window.crypto.getRandomValues(new Uint8Array(12));
 }
 
 // Derive AES-GCM key from Master Password and Salt
 export async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  if (!isSecureCryptoSupported()) {
+    throw new Error('Web Crypto API requires an HTTPS secure connection on mobile browsers.');
+  }
+
   const encoder = new TextEncoder();
   const passwordBuffer = encoder.encode(password);
 
@@ -63,6 +78,10 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
 
 // Encrypt a Javascript object/string using derived CryptoKey
 export async function encryptData<T>(key: CryptoKey, data: T): Promise<{ cipherText: string; iv: string }> {
+  if (!isSecureCryptoSupported()) {
+    throw new Error('Web Crypto API requires an HTTPS secure connection on mobile browsers.');
+  }
+
   const encoder = new TextEncoder();
   const jsonString = JSON.stringify(data);
   const dataBuffer = encoder.encode(jsonString);
@@ -85,6 +104,10 @@ export async function encryptData<T>(key: CryptoKey, data: T): Promise<{ cipherT
 
 // Decrypt ciphertext using derived CryptoKey
 export async function decryptData<T>(key: CryptoKey, cipherTextBase64: string, ivBase64: string): Promise<T> {
+  if (!isSecureCryptoSupported()) {
+    throw new Error('Web Crypto API requires an HTTPS secure connection on mobile browsers.');
+  }
+
   const cipherBuffer = base64ToBuffer(cipherTextBase64);
   const ivBuffer = base64ToBuffer(ivBase64);
 

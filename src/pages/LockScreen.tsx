@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthKey } from '../context/AuthKeyContext';
+import { isSecureCryptoSupported } from '../services/crypto';
 import { ShieldCheck, Lock, KeyRound, AlertTriangle } from 'lucide-react';
 import { Button } from '../components/Button';
 
@@ -12,10 +13,18 @@ export const LockScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  const isSecureContext = isSecureCryptoSupported();
+
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) return;
     setError('');
+
+    if (!isSecureContext) {
+      setError('Mobile browsers require an HTTPS secure connection (or GitHub Pages / localhost) to unlock encryption features.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -23,8 +32,8 @@ export const LockScreen: React.FC = () => {
       if (!success) {
         setError('Incorrect password. Please try again.');
       }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -33,6 +42,11 @@ export const LockScreen: React.FC = () => {
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isSecureContext) {
+      setError('Mobile browsers require an HTTPS secure connection (or GitHub Pages / localhost) to set up encryption features.');
+      return;
+    }
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters long.');
@@ -47,8 +61,8 @@ export const LockScreen: React.FC = () => {
     setIsSubmitting(true);
     try {
       await setupMasterPassword(password);
-    } catch (err) {
-      setError('Failed to set up master password.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to set up master password.');
     } finally {
       setIsSubmitting(false);
     }
@@ -81,10 +95,22 @@ export const LockScreen: React.FC = () => {
             <Lock className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Welcome to FinTrack</h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 font-medium">
             Your private personal finance app
           </p>
         </div>
+
+        {!isSecureContext && (
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1 font-medium">
+            <div className="flex items-center gap-1.5 font-bold text-amber-950">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              HTTPS Connection Required on Mobile
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed font-normal">
+              Mobile browsers disable Web Crypto API over HTTP IP addresses. Please open via HTTPS or GitHub Pages URL.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2 font-medium">

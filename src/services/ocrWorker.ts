@@ -1,4 +1,4 @@
-import { createWorker } from 'tesseract.js';
+import { createWorker, PSM } from 'tesseract.js';
 import { OCRResult } from '../types';
 
 export async function processReceiptOCR(
@@ -8,6 +8,11 @@ export async function processReceiptOCR(
   const worker = await createWorker('eng');
 
   try {
+    // Lock Page Segmentation Mode (PSM) to AUTO or SINGLE_BLOCK to ensure 100% deterministic layout parsing
+    await worker.setParameters({
+      tessedit_pageseg_mode: PSM.AUTO,
+    });
+
     const ret = await worker.recognize(imageDataUrl);
     const rawText = ret.data.text;
     const confidence = ret.data.confidence;
@@ -28,43 +33,46 @@ export function parseReceiptHeuristics(rawText: string, confidence: number): OCR
   let amount: number | undefined;
   let date: string | undefined;
 
-  // 1. Merchant Extraction: Usually the first prominent non-trivial text line
+  // 1. Merchant Extraction: Pick top-most clean non-keyword header line
   for (const line of lines) {
+    const cleanLine = line.replace(/[^a-zA-Z0-9\s]/g, '').trim();
     if (
-      line.length > 2 &&
-      !/receipt|invoice|tax|bill|date|total|amount|welcome|thank/i.test(line) &&
-      /[a-zA-Z]/.test(line)
+      cleanLine.length >= 3 &&
+      !/receipt|invoice|tax|bill|date|total|amount|welcome|thank|phone|tel|gstin|store|copy|customer/i.test(cleanLine) &&
+      /[a-zA-Z]{2,}/.test(cleanLine)
     ) {
-      merchant = line;
+      merchant = cleanLine;
       break;
     }
   }
 
   // 2. Amount Extraction:
-  // Look for keywords like "Total", "Grand Total", "Amount Due", "Net", "Rs", "INR", "₹"
-  const amountRegexes = [
-    /(?:grand\s*total|total\s*amount|total|net\s*amount|amount\s*paid|payable)[\s:\-=₹RsINR]*([0-9,]+\.?[0-9]{0,2})/i,
+  // Look for keywords like "Grand Total", "Total Amount", "Total", "Net Amount", "Amount Paid", "Payable", "₹", "Rs"
+  const amountPatterns = [
+    /(?:grand\s*total|total\s*amount|net\s*amount|amount\s*paid|payable)[\s:\-=₹RsINR]*([0-9,]+\.?[0-9]{0,2})/i,
+    /(?:total)[\s:\-=₹RsINR]*([0-9,]+\.?[0-9]{0,2})/i,
     /(?:₹|Rs\.?|INR)\s*([0-9,]+\.?[0-9]{0,2})/i,
   ];
 
-  for (const regex of amountRegexes) {
-    const match = rawText.match(regex);
+  for (const pattern of amountPatterns) {
+    const match = rawText.match(pattern);
     if (match && match[1]) {
       const parsed = parseFloat(match[1].replace(/,/g, ''));
-      if (!isNaN(parsed) && parsed > 0) {
+      // Filter out obvious year numbers (e.g. 2024, 2025, 2026)
+      if (!isNaN(parsed) && parsed > 0 && !(parsed >= 2020 && parsed <= 2035 && Number.isInteger(parsed))) {
         amount = parsed;
         break;
       }
     }
   }
 
-  // Fallback Amount Extraction: Highest number with decimals
+  // Fallback Amount Extraction: Highest numeric value with decimal places
   if (!amount) {
-    const numberMatches = rawText.match(/\b\d+\.\d{2}\b/g);
+    const numberMatches = rawText.match(/\b\d+[\.,]\d{2}\b/g);
     if (numberMatches) {
       const numbers = numberMatches
         .map(n => parseFloat(n.replace(/,/g, '')))
-        .filter(n => !isNaN(n));
+        .filter(n => !isNaN(n) && !(n >= 2020 && n <= 2035 && Number.isInteger(n)));
       if (numbers.length > 0) {
         amount = Math.max(...numbers);
       }
@@ -72,7 +80,6 @@ export function parseReceiptHeuristics(rawText: string, confidence: number): OCR
   }
 
   // 3. Date Extraction:
-  // Patterns like DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY
   const dateRegexes = [
     /\b(\d{4}[/-]\d{1,2}[/-]\d{1,2})\b/, // YYYY-MM-DD
     /\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/, // DD/MM/YYYY
@@ -101,7 +108,7 @@ export function parseReceiptHeuristics(rawText: string, confidence: number): OCR
   }
 
   return {
-    merchant: merchant || 'Unknown Merchant',
+    merchant: merchant || 'Scanned Merchant',
     amount: amount || 0,
     date,
     rawText,
