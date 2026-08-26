@@ -1,7 +1,10 @@
 {
   "name": "FinTrack Personal Finance Vault",
   "short_name": "FinTrack",
+  "description": "Privacy-first personal finance app with receipt scanning, payslips, and income tax planning.",
+  "categories": ["finance", "productivity"],
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#0284c7",
@@ -10,12 +13,30 @@
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "FinTrack Desktop Finance Vault"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "FinTrack Mobile Finance Vault"
     }
   ]
 }

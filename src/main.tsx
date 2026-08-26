@@ -5,9 +5,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
 // Register service worker for offline local-first PWA execution
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
       console.log('ServiceWorker registration handled: ', err);
     });
   });
